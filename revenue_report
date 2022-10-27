@@ -1,0 +1,37 @@
+with
+regional_mapping as (SELECT * FROM `upload_regional_mapping`),
+sales_partner as (select * from `sales_partner` ),
+delivery_note_with_index as (
+                            SELECT *, 
+                            row_number()over(partition by name order by modified desc) as index 
+                            FROM `delivery_note` 
+                            ),
+delivery_note_with_items as (
+                              select distinct dn.posting_date,
+                              dn.company,
+                              dn.territory,
+                              dn.sales_partner,
+                              dn.sales_order,
+                              dn.name as delivery_note,
+                              dn.created_on_app,
+                              dn.customer,
+                              dn.customer_name,
+                              dni.item_group,
+                              dni.name,
+                              dni.item_name,
+                              dni.item_code,
+                              dni.uom,
+                              dni.qty,
+                              dn.price_list_currency,
+                              dni.amount,
+                              rm.*except(id, territory, company),
+                              sp.supplier
+                              from delivery_note_with_index dn
+                              cross join unnest(items) dni
+                              left join regional_mapping rm on dn.territory = rm.territory
+                              left join sales_partner sp on dn.sales_partner = sp.name 
+                              where index = 1
+                              )
+select * from delivery_note_with_items dn
+where FORMAT_DATE('%Y%m%d', posting_date) between @DS_START_DATE and @DS_END_DATE  
+
